@@ -3,57 +3,53 @@ import pandas as pd
 import os
 from datetime import datetime
 
-# --- Φάκελοι ---
-DATA_FOLDER = "data"
-ATTACHMENTS_FOLDER = "attachments"
-EXCEL_FILE = os.path.join(DATA_FOLDER, "expenses.xlsx")
+# Φάκελοι
+data_folder = "data"
+attachments_folder = "attachments"
 
-os.makedirs(DATA_FOLDER, exist_ok=True)
-os.makedirs(ATTACHMENTS_FOLDER, exist_ok=True)
+os.makedirs(data_folder, exist_ok=True)
+os.makedirs(attachments_folder, exist_ok=True)
 
-# --- Τίτλος εφαρμογής ---
+excel_file = os.path.join(data_folder, "expenses.xlsx")
+
 st.title("Καταχώριση Εξόδων")
 
-# --- Φόρμα για νέο έξοδο ---
-with st.form("new_expense"):
-    date = st.date_input("Ημερομηνία", datetime.today())
-    description = st.text_input("Περιγραφή")
-    amount = st.number_input("Ποσό", min_value=0.0, format="%.2f")
-    uploaded_file = st.file_uploader("Επισύναψη αρχείου (φωτογραφία ή pdf)", type=["jpg","jpeg","png","pdf"])
-    submit = st.form_submit_button("Καταχώριση")
+# Πεδία
+name = st.text_input("Όνομα εργαζόμενου")
+date = st.date_input("Ημερομηνία")
+description = st.text_input("Περιγραφή")
+amount = st.number_input("Ποσό", min_value=0.0)
+uploaded_file = st.file_uploader("Επισύναψη αρχείου", type=["jpg", "jpeg", "png", "pdf"])
 
-    if submit:
-        # --- Ανέβασμα επισυναπτόμενου ---
-        attachment_path = ""
-        if uploaded_file:
-            attachment_path = os.path.join(ATTACHMENTS_FOLDER, uploaded_file.name)
-            with open(attachment_path, "wb") as f:
-                f.write(uploaded_file.getbuffer())
+if st.button("Καταχώριση"):
+    file_path = ""
 
-        # --- Διαχείριση Excel ---
-        if os.path.exists(EXCEL_FILE):
-            df = pd.read_excel(EXCEL_FILE)
-        else:
-            df = pd.DataFrame(columns=["Ημερομηνία", "Περιγραφή", "Ποσό", "Αρχείο"])
+    if uploaded_file is not None:
+        file_path = os.path.join(attachments_folder, uploaded_file.name)
+        with open(file_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
 
-        df = pd.concat([df, pd.DataFrame([{
-            "Ημερομηνία": date,
-            "Περιγραφή": description,
-            "Ποσό": amount,
-            "Αρχείο": attachment_path
-        }])], ignore_index=True)
+    new_data = {
+        "Ημερομηνία": str(date),
+        "Όνομα": name,
+        "Περιγραφή": description,
+        "Ποσό": amount,
+        "Απόδειξη": file_path
+    }
 
-        df.to_excel(EXCEL_FILE, index=False)
-        st.success("Η καταχώριση προστέθηκε!")
+    # Αν υπάρχει ήδη το Excel
+    if os.path.exists(excel_file):
+        df = pd.read_excel(excel_file)
+        df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
+    else:
+        df = pd.DataFrame([new_data])
 
-# --- Προβολή καταχωρίσεων ---
-st.subheader("Καταχωρισμένα έξοδα")
-if os.path.exists(EXCEL_FILE):
-    df = pd.read_excel(EXCEL_FILE)
-    for i, row in df.iterrows():
-        file_link = ""
-        if pd.notna(row["Αρχείο"]) and os.path.exists(row["Αρχείο"]):
-            file_link = f"[Άνοιγμα αρχείου]({row['Αρχείο']})"
-        st.markdown(f"- {row['Ημερομηνία']} | {row['Περιγραφή']} | {row['Ποσό']} € {file_link}")
-else:
-    st.info("Δεν υπάρχουν καταχωρίσεις ακόμη.")
+    df.to_excel(excel_file, index=False)
+
+    st.success("Η καταχώριση αποθηκεύτηκε!")
+
+# Προβολή δεδομένων
+if os.path.exists(excel_file):
+    df = pd.read_excel(excel_file)
+    st.subheader("Καταχωρίσεις")
+    st.dataframe(df)
