@@ -62,7 +62,8 @@ if st.button("Καταχώριση"):
             file = drive_service.files().create(
                 body=file_metadata,
                 media_body=media,
-                fields='id'
+                fields='id',
+                supportsAllDrives=True   # 🔥 ΤΟ FIX ΠΟΥ ΕΛΕΙΠΕ
             ).execute()
 
             file_id = file.get('id')
