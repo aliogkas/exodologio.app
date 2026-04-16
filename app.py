@@ -1,55 +1,55 @@
 import streamlit as st
 import pandas as pd
-import os
 from datetime import datetime
+import gspread
+from google.oauth2.service_account import Credentials
 
-# Φάκελοι
-data_folder = "data"
-attachments_folder = "attachments"
+# ========================
+# GOOGLE SHEETS CONNECTION
+# ========================
 
-os.makedirs(data_folder, exist_ok=True)
-os.makedirs(attachments_folder, exist_ok=True)
+SHEET_ID = "1yKVCbakKRLRGJIkv0SIJ3ujy7rhOZ_n64rEwDDNglLM"
 
-excel_file = os.path.join(data_folder, "expenses.xlsx")
+scope = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
+
+creds = Credentials.from_service_account_info(
+    st.secrets["gcp_service_account"],
+    scopes=scope
+)
+
+client = gspread.authorize(creds)
+
+sheet = client.open_by_key(SHEET_ID).sheet1
+
+# ========================
+# UI
+# ========================
 
 st.title("Καταχώριση Εξόδων")
 
-# Πεδία
 name = st.text_input("Όνομα εργαζόμενου")
-date = st.date_input("Ημερομηνία")
+date = st.date_input("Ημερομηνία", datetime.today())
 description = st.text_input("Περιγραφή")
 amount = st.number_input("Ποσό", min_value=0.0)
-uploaded_file = st.file_uploader("Επισύναψη αρχείου", type=["jpg", "jpeg", "png", "pdf"])
+uploaded_file = st.file_uploader("Επισύναψη αρχείου (φωτογραφία ή pdf)")
 
 if st.button("Καταχώριση"):
-    file_path = ""
+    if name and description and amount:
 
-    if uploaded_file is not None:
-        file_path = os.path.join(attachments_folder, uploaded_file.name)
-        with open(file_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
+        # αποθήκευση δεδομένων στο sheet
+        new_row = [
+            name,
+            str(date),
+            description,
+            amount
+        ]
 
-    new_data = {
-        "Ημερομηνία": str(date),
-        "Όνομα": name,
-        "Περιγραφή": description,
-        "Ποσό": amount,
-        "Απόδειξη": file_path
-    }
+        sheet.append_row(new_row)
 
-    # Αν υπάρχει ήδη το Excel
-    if os.path.exists(excel_file):
-        df = pd.read_excel(excel_file)
-        df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
+        st.success("Η καταχώριση αποθηκεύτηκε!")
+
     else:
-        df = pd.DataFrame([new_data])
-
-    df.to_excel(excel_file, index=False)
-
-    st.success("Η καταχώριση αποθηκεύτηκε!")
-
-# Προβολή δεδομένων
-if os.path.exists(excel_file):
-    df = pd.read_excel(excel_file)
-    st.subheader("Καταχωρίσεις")
-    st.dataframe(df)
+        st.error("Συμπλήρωσε όλα τα πεδία!")
