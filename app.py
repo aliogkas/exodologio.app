@@ -11,7 +11,6 @@ import io
 # ========================
 
 SHEET_ID = "1yKVCbakKRLRGJIkv0SIJ3ujy7rhOZ_n64rEwDDNglLM"
-FOLDER_ID = "1zM--oiH1QpShP06X_SZoqchjjxuI6Oi2"
 
 scope = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -31,6 +30,28 @@ sheet = client.open_by_key(SHEET_ID).sheet1
 drive_service = build('drive', 'v3', credentials=creds)
 
 # ========================
+# CREATE FOLDER (AUTO)
+# ========================
+
+def get_or_create_folder():
+    query = "name='Exodologio Files' and mimeType='application/vnd.google-apps.folder'"
+    results = drive_service.files().list(q=query).execute()
+
+    files = results.get('files', [])
+
+    if files:
+        return files[0]['id']
+    else:
+        folder_metadata = {
+            'name': 'Exodologio Files',
+            'mimeType': 'application/vnd.google-apps.folder'
+        }
+        folder = drive_service.files().create(body=folder_metadata).execute()
+        return folder['id']
+
+FOLDER_ID = get_or_create_folder()
+
+# ========================
 # UI
 # ========================
 
@@ -47,7 +68,6 @@ if st.button("Καταχώριση"):
 
         file_link = ""
 
-        # Upload file to Google Drive
         if uploaded_file is not None:
             file_bytes = uploaded_file.read()
             file_stream = io.BytesIO(file_bytes)
@@ -62,15 +82,12 @@ if st.button("Καταχώριση"):
             file = drive_service.files().create(
                 body=file_metadata,
                 media_body=media,
-                fields='id',
-                supportsAllDrives=True   # 🔥 ΤΟ FIX ΠΟΥ ΕΛΕΙΠΕ
+                fields='id'
             ).execute()
 
             file_id = file.get('id')
-
             file_link = f"https://drive.google.com/file/d/{file_id}/view"
 
-        # Save to Google Sheets
         new_row = [
             name,
             str(date),
