@@ -2,9 +2,7 @@ import streamlit as st
 from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
-import io
+import os
 
 # ========================
 # SETTINGS
@@ -22,34 +20,8 @@ creds = Credentials.from_service_account_info(
     scopes=scope
 )
 
-# Google Sheets
 client = gspread.authorize(creds)
 sheet = client.open_by_key(SHEET_ID).sheet1
-
-# Google Drive
-drive_service = build('drive', 'v3', credentials=creds)
-
-# ========================
-# CREATE FOLDER (AUTO)
-# ========================
-
-def get_or_create_folder():
-    query = "name='Exodologio Files' and mimeType='application/vnd.google-apps.folder'"
-    results = drive_service.files().list(q=query).execute()
-
-    files = results.get('files', [])
-
-    if files:
-        return files[0]['id']
-    else:
-        folder_metadata = {
-            'name': 'Exodologio Files',
-            'mimeType': 'application/vnd.google-apps.folder'
-        }
-        folder = drive_service.files().create(body=folder_metadata).execute()
-        return folder['id']
-
-FOLDER_ID = get_or_create_folder()
 
 # ========================
 # UI
@@ -61,39 +33,28 @@ name = st.text_input("Όνομα εργαζόμενου")
 date = st.date_input("Ημερομηνία", datetime.today())
 description = st.text_input("Περιγραφή")
 amount = st.number_input("Ποσό", min_value=0.0)
-uploaded_file = st.file_uploader("Επισύναψη αρχείου (φωτογραφία ή pdf)")
+uploaded_file = st.file_uploader("Επισύναψη αρχείου")
 
 if st.button("Καταχώριση"):
     if name and description and amount:
 
-        file_link = ""
+        file_name = ""
 
         if uploaded_file is not None:
-            file_bytes = uploaded_file.read()
-            file_stream = io.BytesIO(file_bytes)
+            os.makedirs("uploads", exist_ok=True)
+            file_path = os.path.join("uploads", uploaded_file.name)
 
-            file_metadata = {
-                'name': uploaded_file.name,
-                'parents': [FOLDER_ID]
-            }
+            with open(file_path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
 
-            media = MediaIoBaseUpload(file_stream, mimetype=uploaded_file.type)
-
-            file = drive_service.files().create(
-                body=file_metadata,
-                media_body=media,
-                fields='id'
-            ).execute()
-
-            file_id = file.get('id')
-            file_link = f"https://drive.google.com/file/d/{file_id}/view"
+            file_name = uploaded_file.name
 
         new_row = [
             name,
             str(date),
             description,
             amount,
-            file_link
+            file_name
         ]
 
         sheet.append_row(new_row)
