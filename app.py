@@ -15,9 +15,6 @@ SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
 SPREADSHEET_ID = "1yKVCbakKRLRGJIkv0SIJ3ujy7rhOZ_n64rEwDDNglLM"
 
-# ✅ ΤΟ ΣΩΣΤΟ ΟΝΟΜΑ ΤΟΥ SHEET
-SHEET_NAME = "exodologio"
-
 # ==============================
 # 🔐 GOOGLE AUTH
 # ==============================
@@ -77,7 +74,7 @@ with st.form("form"):
     category = st.text_input("Κατηγορία")
     amount = st.number_input("Ποσό", min_value=0.0, step=0.1)
     notes = st.text_input("Σημειώσεις")
-    uploaded_file = st.file_uploader("Αρχείο (εικόνα/pdf)", type=["jpg", "png", "pdf"])
+    uploaded_file = st.file_uploader("Αρχείο", type=["jpg", "png", "pdf"])
 
     submit = st.form_submit_button("Καταχώρηση")
 
@@ -107,7 +104,7 @@ if submit:
         try:
             sheet.values().append(
                 spreadsheetId=SPREADSHEET_ID,
-                range=f"{SHEET_NAME}!A1",
+                range="A1",  # 🔥 ΠΑΝΤΑ ΔΟΥΛΕΥΕΙ
                 valueInputOption="USER_ENTERED",
                 insertDataOption="INSERT_ROWS",
                 body={"values": values}
