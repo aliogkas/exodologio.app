@@ -61,7 +61,7 @@ def upload_to_supabase(file):
         return f"{SUPABASE_URL}/storage/v1/object/public/files/{safe_name}"
     else:
         st.error(f"Upload error: {response.text}")
-        return None
+        return ""
 
 # ==============================
 # 🎨 UI
@@ -70,6 +70,7 @@ def upload_to_supabase(file):
 st.title("📊 Εξοδολόγιο")
 
 with st.form("form"):
+    user = st.text_input("Όνομα χρήστη")   # ✅ ΠΡΟΣΘΗΚΗ
     date = st.date_input("Ημερομηνία", datetime.date.today())
     category = st.text_input("Κατηγορία")
     amount = st.number_input("Ποσό", min_value=0.0, step=0.1)
@@ -83,28 +84,33 @@ with st.form("form"):
 # ==============================
 
 if submit:
-    file_link = ""
 
-    if uploaded_file:
-        file_link = upload_to_supabase(uploaded_file)
+    if user == "":
+        st.error("Βάλε όνομα χρήστη")
+    else:
+        file_link = ""
 
-    values = [[
-        str(date),
-        category,
-        amount,
-        notes,
-        file_link
-    ]]
+        if uploaded_file:
+            file_link = upload_to_supabase(uploaded_file)
 
-    body = {
-        "values": values
-    }
+        values = [[
+            user,                      # ✅ ΠΡΩΤΗ ΣΤΗΛΗ
+            str(date),
+            category,
+            amount,
+            notes,
+            file_link
+        ]]
 
-    sheet.values().append(
-        spreadsheetId=SPREADSHEET_ID,
-        range=f"{SHEET_NAME}!A:E",
-        valueInputOption="USER_ENTERED",
-        body=body
-    ).execute()
+        body = {
+            "values": values
+        }
 
-    st.success("✅ Καταχωρήθηκε!")
+        sheet.values().append(
+            spreadsheetId=SPREADSHEET_ID,
+            range=f"{SHEET_NAME}!A:F",   # ✅ 6 στήλες τώρα
+            valueInputOption="USER_ENTERED",
+            body=body
+        ).execute()
+
+        st.success("✅ Καταχωρήθηκε!")
