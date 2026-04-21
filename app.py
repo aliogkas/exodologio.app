@@ -14,7 +14,9 @@ SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
 SPREADSHEET_ID = "1yKVCbakKRLRGJIkv0SIJ3ujy7rhOZ_n64rEwDDNglLM"
-SHEET_NAME = "Sheet1"
+
+# ✅ ΤΟ ΣΩΣΤΟ ΟΝΟΜΑ ΤΟΥ SHEET
+SHEET_NAME = "exodologio"
 
 # ==============================
 # 🔐 GOOGLE AUTH
@@ -70,12 +72,12 @@ def upload_to_supabase(file):
 st.title("📊 Εξοδολόγιο")
 
 with st.form("form"):
-    user = st.text_input("Όνομα χρήστη")   # ✅ ΠΡΟΣΘΗΚΗ
+    user = st.text_input("Όνομα χρήστη")
     date = st.date_input("Ημερομηνία", datetime.date.today())
     category = st.text_input("Κατηγορία")
     amount = st.number_input("Ποσό", min_value=0.0, step=0.1)
     notes = st.text_input("Σημειώσεις")
-    uploaded_file = st.file_uploader("Αρχείο (π.χ εικόνα)", type=["jpg", "png", "pdf"])
+    uploaded_file = st.file_uploader("Αρχείο (εικόνα/pdf)", type=["jpg", "png", "pdf"])
 
     submit = st.form_submit_button("Καταχώρηση")
 
@@ -85,7 +87,7 @@ with st.form("form"):
 
 if submit:
 
-    if user == "":
+    if user.strip() == "":
         st.error("Βάλε όνομα χρήστη")
     else:
         file_link = ""
@@ -94,7 +96,7 @@ if submit:
             file_link = upload_to_supabase(uploaded_file)
 
         values = [[
-            user,                      # ✅ ΠΡΩΤΗ ΣΤΗΛΗ
+            user,
             str(date),
             category,
             amount,
@@ -102,15 +104,16 @@ if submit:
             file_link
         ]]
 
-        body = {
-            "values": values
-        }
+        try:
+            sheet.values().append(
+                spreadsheetId=SPREADSHEET_ID,
+                range=f"{SHEET_NAME}!A1",
+                valueInputOption="USER_ENTERED",
+                insertDataOption="INSERT_ROWS",
+                body={"values": values}
+            ).execute()
 
-        sheet.values().append(
-            spreadsheetId=SPREADSHEET_ID,
-            range=f"{SHEET_NAME}!A:F",   # ✅ 6 στήλες τώρα
-            valueInputOption="USER_ENTERED",
-            body=body
-        ).execute()
+            st.success("✅ Καταχωρήθηκε!")
 
-        st.success("✅ Καταχωρήθηκε!")
+        except Exception as e:
+            st.error(f"Σφάλμα Google Sheets: {str(e)}")
