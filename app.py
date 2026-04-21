@@ -1,18 +1,24 @@
 import streamlit as st
-from datetime import datetime
-import gspread
-from google.oauth2.service_account import Credentials
 import requests
-import time
+import datetime
+import unicodedata
 
-# ========================
-# SETTINGS
-# ========================
+from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
 
-SHEET_ID = "1yKVCbakKRLRGJIkv0SIJ3ujy7rhOZ_n64rEwDDNglLM"
+# ==============================
+# 🔐 CONFIG
+# ==============================
 
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+
+SPREADSHEET_ID = "1yKVCbakKRLRGJIkv0SIJ3ujy7rhOZ_n64rEwDDNglLM"
+SHEET_NAME = "Sheet1"
+
+# ==============================
+# 🔐 GOOGLE AUTH
+# ==============================
 
 scope = ["https://www.googleapis.com/auth/spreadsheets"]
 
@@ -21,65 +27,84 @@ creds = Credentials.from_service_account_info(
     scopes=scope
 )
 
-client = gspread.authorize(creds)
-sheet = client.open_by_key(SHEET_ID).sheet1
+service = build("sheets", "v4", credentials=creds)
+sheet = service.spreadsheets()
 
-# ========================
-# UPLOAD FUNCTION
-# ========================
+# ==============================
+# 🧹 CLEAN FILENAME
+# ==============================
+
+def clean_filename(name):
+    return unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
+
+# ==============================
+# ☁️ UPLOAD TO SUPABASE
+# ==============================
 
 def upload_to_supabase(file):
-    timestamp = int(time.time())
-    file_name = f"{timestamp}_{file.name}"
+    safe_name = clean_filename(file.name)
 
-    url = f"{SUPABASE_URL}/storage/v1/object/receipts/{file_name}"
+    url = f"{SUPABASE_URL}/storage/v1/object/public/files/{safe_name}"
 
     headers = {
         "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": file.type
+        "Authorization": f"Bearer {SUPABASE_KEY}"
     }
 
-    response = requests.post(url, headers=headers, data=file.read())
+    files = {
+        "file": (safe_name, file, file.type)
+    }
+
+    response = requests.post(url, headers=headers, files=files)
 
     if response.status_code in [200, 201]:
-        public_url = f"{SUPABASE_URL}/storage/v1/object/public/receipts/{file_name}"
-        return public_url
+        return f"{SUPABASE_URL}/storage/v1/object/public/files/{safe_name}"
     else:
-        st.error(response.text)
-        return ""
+        st.error(f"Upload error: {response.text}")
+        return None
 
-# ========================
-# UI
-# ========================
+# ==============================
+# 🎨 UI
+# ==============================
 
-st.title("Καταχώριση Εξόδων")
+st.title("📊 Εξοδολόγιο")
 
-name = st.text_input("Όνομα εργαζόμενου")
-date = st.date_input("Ημερομηνία", datetime.today())
-description = st.text_input("Περιγραφή")
-amount = st.number_input("Ποσό", min_value=0.0)
-uploaded_file = st.file_uploader("Επισύναψη αρχείου")
+with st.form("form"):
+    date = st.date_input("Ημερομηνία", datetime.date.today())
+    category = st.text_input("Κατηγορία")
+    amount = st.number_input("Ποσό", min_value=0.0, step=0.1)
+    notes = st.text_input("Σημειώσεις")
+    uploaded_file = st.file_uploader("Αρχείο (π.χ εικόνα)", type=["jpg", "png", "pdf"])
 
-if st.button("Καταχώριση"):
-    if name and description and amount:
+    submit = st.form_submit_button("Καταχώρηση")
 
-        file_link = ""
+# ==============================
+# 🚀 SUBMIT
+# ==============================
 
-        if uploaded_file is not None:
-            file_link = upload_to_supabase(uploaded_file)
+if submit:
+    file_link = ""
 
-        new_row = [
-            name,
-            str(date),
-            description,
-            amount,
-            file_link
-        ]
+    if uploaded_file:
+        file_link = upload_to_supabase(uploaded_file)
 
-        sheet.append_row(new_row)
+    values = [[
+        str(date),
+        category,
+        amount,
+        notes,
+        file_link
+    ]]
 
-        st.success("Η καταχώριση αποθηκεύτηκε!")
+    body = {
+        "values": values
+    }
 
-    else:
-        st.error("Συμπλήρωσε όλα τα πεδία!")
+    sheet.values().append(
+        spreadsheetId=SPREADSHEET_ID,
+        range=f"{SHEET_NAME}!A:E",
+        valueInputOption="USER_ENTERED",
+        body=body
+    ).execute()
+
+    st.success("✅ Καταχωρήθηκε!")
