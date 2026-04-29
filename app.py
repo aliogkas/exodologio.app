@@ -37,24 +37,21 @@ def clean_filename(name):
     return unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
 
 # ==============================
-# ☁️ UPLOAD TO SUPABASE
+# ☁️ UPLOAD TO SUPABASE (FIXED)
 # ==============================
 
 def upload_to_supabase(file):
     safe_name = clean_filename(file.name)
 
-    url = f"{SUPABASE_URL}/storage/v1/object/public/files/{safe_name}"
+    url = f"{SUPABASE_URL}/storage/v1/object/files/{safe_name}"
 
     headers = {
         "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}"
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": file.type
     }
 
-    files = {
-        "file": (safe_name, file, file.type)
-    }
-
-    response = requests.post(url, headers=headers, files=files)
+    response = requests.post(url, headers=headers, data=file.read())
 
     if response.status_code in [200, 201]:
         return f"{SUPABASE_URL}/storage/v1/object/public/files/{safe_name}"
@@ -92,6 +89,10 @@ if submit:
         if uploaded_file:
             file_link = upload_to_supabase(uploaded_file)
 
+        # 👉 ΚΑΝΕ clickable link
+        if file_link != "":
+            file_link = f'=HYPERLINK("{file_link}", "Άνοιγμα")'
+
         values = [[
             user,
             str(date),
@@ -104,7 +105,7 @@ if submit:
         try:
             sheet.values().append(
                 spreadsheetId=SPREADSHEET_ID,
-                range="A1",  # 🔥 ΠΑΝΤΑ ΔΟΥΛΕΥΕΙ
+                range="A1",  # 🔥 always safe
                 valueInputOption="USER_ENTERED",
                 insertDataOption="INSERT_ROWS",
                 body={"values": values}
